@@ -26,16 +26,12 @@ jobs:
         run: |
           python -m venv venv
           source venv/bin/activate
-
+      
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      - script: |
-        pip install pytest pytest-azurepipelines
-        pip install pytest-cov
-        pytest --doctest-modules --junitxml=junit/test-results.xml --cov=. --cov-report=xml
-      displayName: 'pytest'
-
+        
+      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+      
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v2
         with:
@@ -64,4 +60,4 @@ jobs:
         with:
           app-name: 'sharpcookingapi'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_F35AECEAF5FA49948209FC3F28A1A35A }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_905F96C9CE2848D0AF00B6A1970C8E45 }}
