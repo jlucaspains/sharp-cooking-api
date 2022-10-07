@@ -23,6 +23,14 @@ def test_recipe_parse():
     assert len(parsed_response["instructions"]) == 2
     assert parsed_response["instructions"][0]["minutes"] == 12
 
+def test_recipe_parse_exception():
+    response = client.post("/recipe/parse", json={
+            "url": "https://www.foodnk.com/recipes/rachael-ray/pork-chops-with-golden-apple-sauce-recipe-1915826",
+        })
+    assert response.status_code == 400
+    parsed_response = response.text
+    assert parsed_response == r'{"detail":"Could not find a recipe in the web page"}'
+
 # ingredient parser
 def test_ingredient_parse_simple():
     parsed = parse_recipe_ingredient("10 grams flour", "en")

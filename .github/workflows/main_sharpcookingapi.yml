@@ -8,6 +8,8 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 jobs:
@@ -30,11 +32,21 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Unit tests
+      # - name: Unit tests
+      #   run: |
+      #     pip install pytest
+      #     pip install pytest-cov
+      #     pytest --doctest-modules --junitxml=junit/test-results.xml --cov=. --cov-report=xml
+
+      - name: Unit Tests
         run: |
-          pip install pytest
-          pip install pytest-cov
-          pytest --doctest-modules --junitxml=junit/test-results.xml --cov=. --cov-report=xml
+          pytest --junitxml=pytest.xml --cov=. | tee pytest-coverage.txt
+
+      - name: Pytest coverage comment
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          pytest-coverage-path: ./pytest-coverage.txt
+          junitxml-path: ./pytest.xml
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v2
