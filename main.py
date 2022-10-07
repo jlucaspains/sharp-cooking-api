@@ -92,6 +92,7 @@ def parse_recipe_ingredient(text: str, lang: str):
     """    
     qty_re = re.search(r"^(?P<Value>\d{1,5}\s\d{1,5}\/\d{1,5}|\d{1,5}\/\d{1,5}|\d{1,5}\.?\d{0,5})\s?(?P<Unit>\w*\b)",
                     text)
+
     if not qty_re:
         return { "raw": text, "quantity": 0, "unit": "" }
 
@@ -102,21 +103,18 @@ def parse_recipe_ingredient(text: str, lang: str):
     if unit and unit in ureg:
         unit_value = ureg.get_name(unit)
 
-    if value:
-        parts = value.split(" ")
-        
-        if parts.__len__() == 2:
-            whole = int(parts[0])
-            fraction = Fraction(parts[1])
-            return { "raw": text, "quantity": whole + float(fraction).__round__(2), "unit": unit_value }
-        
-        if parts[0].count("/") >= 0:
-            fraction = Fraction(parts[0])
-            return { "raw": text, "quantity": float(fraction).__round__(2), "unit": unit_value }
-            
-        regular = parts[0]
-        return { "raw": text, "quantity": float(regular), "unit": unit_value }
+    parts = value.split(" ")
     
+    if parts.__len__() == 2:
+        whole = int(parts[0])
+        fraction = Fraction(parts[1])
+        return { "raw": text, "quantity": whole + float(fraction).__round__(2), "unit": unit_value }
+    
+    if parts[0].count("/") == 1:
+        fraction = Fraction(parts[0])
+        return { "raw": text, "quantity": float(fraction).__round__(2), "unit": unit_value }
+        
+    regular = parts[0]
     return { "raw": text, "quantity": float(regular), "unit": unit_value }
 
 def parse_recipe_instruction(text: str, lang: str):
