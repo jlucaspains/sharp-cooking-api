@@ -3,13 +3,15 @@ from main import app, parse_recipe_ingredient, parse_recipe_instruction
 
 client = TestClient(app)
 
+test_url = "/recipe/parse"
+
 def test_docs():
     response = client.get("/docs")
     assert response.status_code == 200
 
 # parse recipe post method
 def test_recipe_parse():
-    response = client.post("/recipe/parse", json={
+    response = client.post(test_url, json={
             "url": "https://www.foodnetwork.com/recipes/rachael-ray/pork-chops-with-golden-apple-sauce-recipe-1915826",
         })
     assert response.status_code == 200
@@ -26,7 +28,7 @@ def test_recipe_parse():
     assert parsed_response["image"].startswith("http")
 
 def test_recipe_parse_download_image():
-    response = client.post("/recipe/parse", json={
+    response = client.post(test_url, json={
             "url": "https://www.foodnetwork.com/recipes/rachael-ray/pork-chops-with-golden-apple-sauce-recipe-1915826",
             "downloadImage": True
         })
@@ -44,7 +46,7 @@ def test_recipe_parse_download_image():
     assert parsed_response["image"].startswith("data:")
 
 def test_recipe_parse_exception():
-    response = client.post("/recipe/parse", json={
+    response = client.post(test_url, json={
             "url": "https://www.foodnk.com/recipes/rachael-ray/pork-chops-with-golden-apple-sauce-recipe-1915826",
         })
     assert response.status_code == 400

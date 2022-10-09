@@ -1,3 +1,4 @@
+from typing import Union
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from logging.handlers import RotatingFileHandler
@@ -44,13 +45,13 @@ class RecipeInstruction(BaseModel):
     minutes: float
 
 class Recipe(BaseModel):
-    title: str = None
-    totalTime: int = None
-    yields: str = None
-    ingredients: list[RecipeIngredient] = None
-    instructions: list[RecipeInstruction] = None
-    image: str = None
-    host: str = None
+    title: Union[str, None] = None
+    totalTime: Union[int, None] = None
+    yields: Union[str, None] = None
+    ingredients: list[RecipeIngredient] = []
+    instructions: list[RecipeInstruction] = []
+    image: Union[str, None] = None
+    host: Union[str, None] = None
 
 class ParseRequest(BaseModel):
     url: str
@@ -96,9 +97,8 @@ def parse_recipe(parse_request: ParseRequest):
         }
         
         if parse_request.downloadImage:
-            response = requests.get(result["image"])
-            uri = ("data:" +  response.headers['Content-Type'] + ";" + "base64," + base64.b64encode(response.content).decode("utf-8"))
-            result["image"] = uri
+            image_uri = parse_recipe_image(result["image"])
+            result["image"] = image_uri
 
         return result
     except Exception as e:
@@ -119,7 +119,7 @@ def parse_recipe_ingredient(text: str, lang: str):
     Returns:
         dictionary: raw text, quantity parsed, unit identified
     """    
-    qty_re = re.search(r"^(?P<Value>\d{1,5}\s\d{1,5}\/\d{1,5}|\d{1,5}\/\d{1,5}|\d{1,5}\.?\d{0,5})\s?(?P<Unit>\w*\b)",
+    qty_re = re.search(r"^(?P<Value>\d{1,5}\s\d{1,5}\/\d{1,5}|\d{1,5}\/\d{1,5}|\d{1,5}\.?\d{0,5})\d*\s?(?P<Unit>\w*\b)",
                     text)
 
     if not qty_re:
@@ -167,7 +167,6 @@ def parse_recipe_instruction(text: str, lang: str):
     
     return { "raw": text, "minutes": minutes }
 
-def parse_recipe_image(imageUrl: str):
-    response = requests.get(imageUrl)
-    uri = ("data:" +  response.headers['Content-Type'] + ";" + "base64," + base64.b64encode(response.content).decode("utf-8"))
-    result = uri
+def parse_recipe_image(image_url: str):
+    response = requests.get(image_url)
+    return ("data:" +  response.headers['Content-Type'] + ";" + "base64," + base64.b64encode(response.content).decode("utf-8"))
