@@ -3,21 +3,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from logging.handlers import RotatingFileHandler
 from pydantic import BaseModel
 from recipe_scrapers import scrape_me
+from fractions import Fraction
+from pint import UnitRegistry
 import re
 import uuid
 import time
-from fractions import Fraction
-from pint import UnitRegistry
+import os
 import logging
+import requests
+import base64
 
 app = FastAPI()
 
-origins = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://localhost:8080",
-    "https://app.sharpcooking.net",
-]
+environment = os.getenv("APP_ENVIRONMENT", "DEV")
+
+origins = ["https://app.sharpcooking.net"]
+
+if environment != "PROD":
+    origins += [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost:8080",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,6 +54,7 @@ class Recipe(BaseModel):
 
 class ParseRequest(BaseModel):
     url: str
+    downloadImage: bool = False
 
 ureg = UnitRegistry()
 logger = logging.getLogger()
@@ -86,6 +94,11 @@ def parse_recipe(parse_request: ParseRequest):
             "image": scraper.image(),
             "host": scraper.host()
         }
+        
+        if parse_request.downloadImage:
+            response = requests.get(result["image"])
+            uri = ("data:" +  response.headers['Content-Type'] + ";" + "base64," + base64.b64encode(response.content).decode("utf-8"))
+            result["image"] = uri
 
         return result
     except Exception as e:
@@ -153,3 +166,8 @@ def parse_recipe_instruction(text: str, lang: str):
         minutes += int(match[4] or "0") * 24 * 60
     
     return { "raw": text, "minutes": minutes }
+
+def parse_recipe_image(imageUrl: str):
+    response = requests.get(imageUrl)
+    uri = ("data:" +  response.headers['Content-Type'] + ";" + "base64," + base64.b64encode(response.content).decode("utf-8"))
+    result = uri
