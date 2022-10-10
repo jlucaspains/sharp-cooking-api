@@ -1,15 +1,39 @@
-import uuid
+from typing import Union
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from logging.handlers import RotatingFileHandler
 from pydantic import BaseModel
 from recipe_scrapers import scrape_me
-import re
 from fractions import Fraction
 from pint import UnitRegistry
-import logging
+import re
+import uuid
 import time
-from logging.handlers import RotatingFileHandler
+import os
+import logging
+import requests
+import base64
 
 app = FastAPI()
+
+environment = os.getenv("APP_ENVIRONMENT", "DEV")
+
+origins = ["https://app.sharpcooking.net"]
+
+if environment != "PROD":
+    origins += [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost:8080",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class RecipeIngredient(BaseModel):
     raw: str
@@ -21,16 +45,17 @@ class RecipeInstruction(BaseModel):
     minutes: float
 
 class Recipe(BaseModel):
-    title: str = None
-    totalTime: int = None
-    yields: str = None
-    ingredients: list[RecipeIngredient] = None
-    instructions: list[RecipeInstruction] = None
-    image: str = None
-    host: str = None
+    title: Union[str, None] = None
+    totalTime: Union[int, None] = None
+    yields: Union[str, None] = None
+    ingredients: list[RecipeIngredient] = []
+    instructions: list[RecipeInstruction] = []
+    image: Union[str, None] = None
+    host: Union[str, None] = None
 
 class ParseRequest(BaseModel):
     url: str
+    downloadImage: bool = False
 
 ureg = UnitRegistry()
 logger = logging.getLogger()
@@ -70,6 +95,10 @@ def parse_recipe(parse_request: ParseRequest):
             "image": scraper.image(),
             "host": scraper.host()
         }
+        
+        if parse_request.downloadImage:
+            image_uri = parse_recipe_image(result["image"])
+            result["image"] = image_uri
 
         return result
     except Exception as e:
@@ -90,7 +119,7 @@ def parse_recipe_ingredient(text: str, lang: str):
     Returns:
         dictionary: raw text, quantity parsed, unit identified
     """    
-    qty_re = re.search(r"^(?P<Value>\d{1,5}\s\d{1,5}\/\d{1,5}|\d{1,5}\/\d{1,5}|\d{1,5}\.?\d{0,5})\s?(?P<Unit>\w*\b)",
+    qty_re = re.search(r"^(?P<Value>\d{1,5}\s\d{1,5}\/\d{1,5}|\d{1,5}\/\d{1,5}|\d{1,5}\.?\d{0,5})\d*\s?(?P<Unit>\w*\b)",
                     text)
 
     if not qty_re:
@@ -137,3 +166,7 @@ def parse_recipe_instruction(text: str, lang: str):
         minutes += int(match[4] or "0") * 24 * 60
     
     return { "raw": text, "minutes": minutes }
+
+def parse_recipe_image(image_url: str):
+    response = requests.get(image_url)
+    return ("data:" +  response.headers['Content-Type'] + ";" + "base64," + base64.b64encode(response.content).decode("utf-8"))
