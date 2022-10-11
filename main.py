@@ -1,18 +1,18 @@
-from typing import Union
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from logging.handlers import RotatingFileHandler
-from pydantic import BaseModel
-from recipe_scrapers import scrape_me
-from fractions import Fraction
-from pint import UnitRegistry
-import re
-import uuid
-import time
+import io
+import json
 import os
 import logging
-import requests
-import base64
+from zipfile import ZipFile
+from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from logging.handlers import RotatingFileHandler
+from recipe_scrapers import scrape_me
+from pint import UnitRegistry
+from uuid import uuid4
+from time import perf_counter
+from util import parse_recipe_ingredient, parse_recipe_ingredients, parse_recipe_instruction
+from util import parse_recipe_instructions, parse_recipe_image, parse_image_from_backup
+from models import ParseRequest, Recipe
 
 app = FastAPI()
 
@@ -35,35 +35,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class RecipeIngredient(BaseModel):
-    raw: str
-    quantity: float
-    unit: str
-
-class RecipeInstruction(BaseModel):
-    raw: str
-    minutes: float
-
-class Recipe(BaseModel):
-    title: Union[str, None] = None
-    totalTime: Union[int, None] = None
-    yields: Union[str, None] = None
-    ingredients: list[RecipeIngredient] = []
-    instructions: list[RecipeInstruction] = []
-    image: Union[str, None] = None
-    host: Union[str, None] = None
-
-class ParseRequest(BaseModel):
-    url: str
-    downloadImage: bool = False
-
 ureg = UnitRegistry()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-handler = RotatingFileHandler('local.log', maxBytes=5000000,
-                                  backupCount=5)
+handler = RotatingFileHandler('local.log', maxBytes=5000000, backupCount=5)
 logger.addHandler(handler)
-
 
 @app.post("/recipe/parse", response_model=Recipe)
 def parse_recipe(parse_request: ParseRequest):
@@ -75,15 +51,15 @@ def parse_recipe(parse_request: ParseRequest):
     Returns:
         dictionary: title, totalTime, yields, ingredients list, instructions list, image, host
     """
-    correlation_id = uuid.uuid4()
+    correlation_id = uuid4()
     try:
-        start = time.perf_counter()
-        logger.info(f"processing request id {correlation_id} for url: {parse_request.url}")
+        start = perf_counter()
+        logger.info(f"processing parse request id {correlation_id} for url: {parse_request.url}")
         scraper = scrape_me(parse_request.url, wild_mode=True)
         
         lang = scraper.language() or "en"
         
-        ingredients = map(lambda x: parse_recipe_ingredient(x, lang), scraper.ingredients())
+        ingredients = map(lambda x: parse_recipe_ingredient(x, lang, ureg), scraper.ingredients())
         instructions = map(lambda x: parse_recipe_instruction(x, lang), scraper.instructions_list())
         
         result = {
@@ -102,71 +78,54 @@ def parse_recipe(parse_request: ParseRequest):
 
         return result
     except Exception as e:
-        logger.error(f"Failed to process request id {correlation_id}. Error: {e}")
+        logger.error(f"Failed to process parse request id {correlation_id}. Error: {e}")
         raise HTTPException(status_code=400, detail="Could not find a recipe in the web page")
     finally:
-        end = time.perf_counter()
-        logger.info(f"Finished processing request id {correlation_id}. Time taken: {end - start:0.4f}s")
+        end = perf_counter()
+        logger.info(f"Finished processing parse request id {correlation_id}. Time taken: {end - start:0.4f}s")
 
-
-def parse_recipe_ingredient(text: str, lang: str):
-    """Parses a single recipe ingredient
+@app.post("/recipe/backup/parse", response_model=list[Recipe])
+def parse_backup(file: UploadFile):
+    """Parses a Sharp Cooking backup file and return the recipes contained within in new json format
 
     Args:
-        text (str): the ingredient e.g. 10 grams flour
-        lang (str): language the ingredient is in
+        file (UploadFile): Backup file in zip
+
+    Raises:
+        HTTPException: if file uploaded is not a zip
 
     Returns:
-        dictionary: raw text, quantity parsed, unit identified
+        _type_: _description_
     """    
-    qty_re = re.search(r"^(?P<Value>\d{1,5}\s\d{1,5}\/\d{1,5}|\d{1,5}\/\d{1,5}|\d{1,5}\.?\d{0,5})\d*\s?(?P<Unit>\w*\b)",
-                    text)
 
-    if not qty_re:
-        return { "raw": text, "quantity": 0, "unit": "" }
-
-    value = qty_re.group("Value")
-    unit = qty_re.group("Unit")
-    
-    unit_value = ""
-    if unit and unit in ureg:
-        unit_value = ureg.get_name(unit)
-
-    parts = value.split(" ")
-    
-    if parts.__len__() == 2:
-        whole = int(parts[0])
-        fraction = Fraction(parts[1])
-        return { "raw": text, "quantity": whole + float(fraction).__round__(2), "unit": unit_value }
-    
-    if parts[0].count("/") == 1:
-        fraction = Fraction(parts[0])
-        return { "raw": text, "quantity": float(fraction).__round__(2), "unit": unit_value }
+    correlation_id = uuid4()
+    try:
+        start = perf_counter()
+        logger.info(f"processing backup request id {correlation_id}")
         
-    regular = parts[0]
-    return { "raw": text, "quantity": float(regular), "unit": unit_value }
-
-def parse_recipe_instruction(text: str, lang: str):
-    """Parses a single recipe instruction
-
-    Args:
-        text (str): knead dough for 10 minutes
-        lang (str): language the instruction is in
-
-    Returns:
-        dictionary: raw instruction, minutes identified for the instruction
-    """    
-    qty_re = re.findall(r"(?P<Minutes>\d{1,5}\.?\d{0,5})\s*(minutes|minute|min)\b|(?P<Hours>\d{1,5}\.?\d{0,5})\s*(hours|hour)\b|(?P<Days>\d{1,5}\.?\d{0,5})\s*(days|day)\b",
-                    text)
-    minutes = 0
+        if file.content_type != "application/x-zip-compressed":
+            raise HTTPException(status_code=400, detail="Only zip files are acceptted")
     
-    for match in qty_re:
-        minutes += int(match[0] or "0")
-        minutes += int(match[2] or "0") * 60
-        minutes += int(match[4] or "0") * 24 * 60
-    
-    return { "raw": text, "minutes": minutes }
+        with ZipFile(io.BytesIO(file.file.read()), 'r') as zip:
+            json_file = zip.read("SharpBackup_Recipe.json")
+            json_content = json.load(io.BytesIO(json_file))
+            
+            result = []
+            for recipe in json_content:
+                result.append({
+                    "title": recipe["Title"],
+                    "totalTime": 0,
+                    "yields": "",
+                    "ingredients": parse_recipe_ingredients(recipe["Ingredients"], ureg),
+                    "instructions": parse_recipe_instructions(recipe["Instructions"]),
+                    "image": parse_image_from_backup(recipe["MainImagePath"], zip),
+                    "host": ""
+                })
 
-def parse_recipe_image(image_url: str):
-    response = requests.get(image_url)
-    return ("data:" +  response.headers['Content-Type'] + ";" + "base64," + base64.b64encode(response.content).decode("utf-8"))
+        return result
+    except Exception as e:
+        logger.error(f"Failed to process backup request id {correlation_id}. Error: {e}")
+        raise HTTPException(status_code=400, detail="The backup file does not seem to be well formatted or generated by Sharp Cooking app")
+    finally:
+        end = perf_counter()
+        logger.info(f"Finished processing backup request id {correlation_id}. Time taken: {end - start:0.4f}s")
