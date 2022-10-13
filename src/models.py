@@ -22,3 +22,7 @@ class Recipe(BaseModel):
 class ParseRequest(BaseModel):
     url: str
     downloadImage: bool = False
+
+class ImageResult(BaseModel):
+    name: str
+    image: str

@@ -44,7 +44,7 @@ def parse_recipe_instructions(text: str):
     
     return result    
 
-def parse_image_from_backup(name: str, zip: ZipFile, resize: bool = True) -> str:
+def parse_image(name: str, image: bytes, resize: bool = True) -> str:
     """Extracts an image from a backup file and convert to uri format
 
     Args:
@@ -53,15 +53,19 @@ def parse_image_from_backup(name: str, zip: ZipFile, resize: bool = True) -> str
 
     Returns:
         str: uri formatted base 64 file
-    """    
-    file = zip.read(name)
+    """
     mime = mimetypes.MimeTypes().guess_type(name)[0]
-    image = Image.open(io.BytesIO(file))
-    image_resized = image.resize((1024, 768))
+    image_open = Image.open(io.BytesIO(image))
+    
+    format = mime.lower().replace("image/", "")
     
     buffered = io.BytesIO()
-    image_resized.save(buffered, format="JPEG")
-    
+    if resize:
+        image_open.thumbnail((1024, 1024), Image.ANTIALIAS)
+        image_open.save(buffered, format=format)
+    else:
+        image_open.save(buffered, format=format)
+        
     return ("data:" +  mime + ";" + "base64," + base64.b64encode(buffered.getvalue()).decode())
 
 def parse_recipe_ingredient(text: str, lang: str, ureg: UnitRegistry):

@@ -10,9 +10,9 @@ from recipe_scrapers import scrape_me
 from pint import UnitRegistry
 from uuid import uuid4
 from time import perf_counter
-from util import parse_recipe_ingredient, parse_recipe_ingredients, parse_recipe_instruction
-from util import parse_recipe_instructions, parse_recipe_image, parse_image_from_backup
-from models import ParseRequest, Recipe
+from src.util import parse_recipe_ingredient, parse_recipe_ingredients, parse_recipe_instruction
+from src.util import parse_recipe_instructions, parse_recipe_image, parse_image
+from src.models import ImageResult, ParseRequest, Recipe
 
 app = FastAPI()
 
@@ -103,7 +103,7 @@ def parse_backup(file: UploadFile):
         start = perf_counter()
         logger.info(f"processing backup request id {correlation_id}")
         
-        if file.content_type != "application/x-zip-compressed":
+        if file.content_type != "application/x-zip-compressed" and file.content_type != "application/zip":
             raise HTTPException(status_code=400, detail="Only zip files are acceptted")
     
         with ZipFile(io.BytesIO(file.file.read()), 'r') as zip:
@@ -112,13 +112,14 @@ def parse_backup(file: UploadFile):
             
             result = []
             for recipe in json_content:
+                image_file = zip.read(recipe["MainImagePath"])
                 result.append({
                     "title": recipe["Title"],
                     "totalTime": 0,
                     "yields": "",
                     "ingredients": parse_recipe_ingredients(recipe["Ingredients"], ureg),
                     "instructions": parse_recipe_instructions(recipe["Instructions"]),
-                    "image": parse_image_from_backup(recipe["MainImagePath"], zip),
+                    "image": parse_image(recipe["MainImagePath"], image_file, zip),
                     "host": ""
                 })
 
@@ -129,3 +130,36 @@ def parse_backup(file: UploadFile):
     finally:
         end = perf_counter()
         logger.info(f"Finished processing backup request id {correlation_id}. Time taken: {end - start:0.4f}s")
+
+@app.post("/image/process", response_model=ImageResult)
+def parse_backup(file: UploadFile):
+    """Processes an image and return a URI base64
+
+    Args:
+        file (UploadFile): image file
+
+    Raises:
+        HTTPException: if file uploaded is not an image
+
+    Returns:
+        str: image resized and formatted in URI base44
+    """    
+
+    correlation_id = uuid4()
+    try:
+        start = perf_counter()
+        logger.info(f"processing image request id {correlation_id}")
+        
+        if not file.content_type.startswith("image"):
+            raise HTTPException(status_code=400, detail="Only image files are acceptted")
+
+        return {
+            "name": file.filename,
+            "image": parse_image(file.filename, file.file.read())
+        }
+    except Exception as e:
+        logger.error(f"Failed to process image request id {correlation_id}. Error: {e}")
+        raise HTTPException(status_code=400, detail="The image file is invalid")
+    finally:
+        end = perf_counter()
+        logger.info(f"Finished processing image request id {correlation_id}. Time taken: {end - start:0.4f}s")
