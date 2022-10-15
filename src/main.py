@@ -120,7 +120,8 @@ def parse_backup(file: UploadFile):
                     "ingredients": parse_recipe_ingredients(recipe["Ingredients"], ureg),
                     "instructions": parse_recipe_instructions(recipe["Instructions"]),
                     "image": parse_image(recipe["MainImagePath"], image_file, zip),
-                    "host": ""
+                    "host": "",
+                    "notes": recipe["Notes"]
                 })
 
         return result

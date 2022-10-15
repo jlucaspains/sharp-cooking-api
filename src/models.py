@@ -18,6 +18,7 @@ class Recipe(BaseModel):
     instructions: list[RecipeInstruction] = []
     image: Union[str, None] = None
     host: Union[str, None] = None
+    notes: Union[str, None] = None
 
 class ParseRequest(BaseModel):
     url: str

@@ -81,7 +81,7 @@ def test_parse_backup():
     assert parsed_response[0]["instructions"][1]["minutes"] == 0
 
 def test_parse_backup_bad_mime():
-    response = client.post(backup_test_url, files={"file": ("test_backup.zip", open("test/test_backup.zip", "rb"), "application/zip")})
+    response = client.post(backup_test_url, files={"file": ("test_backup.zip", open("test/test_backup.zip", "rb"), "application/not-zip")})
     assert response.status_code == 400
     parsed_response = response.json()
     

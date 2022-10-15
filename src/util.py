@@ -49,7 +49,8 @@ def parse_image(name: str, image: bytes, resize: bool = True) -> str:
 
     Args:
         name (str): file name
-        zip (ZipFile): backup file
+        image (bytes): backup file
+        resize (bool): whether to resize the image or not, default is True
 
     Returns:
         str: uri formatted base 64 file
@@ -61,7 +62,7 @@ def parse_image(name: str, image: bytes, resize: bool = True) -> str:
     
     buffered = io.BytesIO()
     if resize:
-        image_open.thumbnail((1024, 1024), Image.ANTIALIAS)
+        image_open.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
         image_open.save(buffered, format=format)
     else:
         image_open.save(buffered, format=format)
