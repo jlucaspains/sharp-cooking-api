@@ -8,5 +8,6 @@ pip install -r requirements.txt
 ```
 3. Run/Debug in vscode with ``F5`` or run:
 ```cmd
-uvicorn main:app --reload
+uvicorn src.main:app --reload
 ```
+4. Navigate to ``http://localhost:8000/docs``
