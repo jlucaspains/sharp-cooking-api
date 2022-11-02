@@ -67,7 +67,7 @@ def parse_recipe(parse_request: ParseRequest):
             "totalTime": scraper.total_time(),
             "yields": scraper.yields(),
             "ingredients": list(ingredients),
-            "instructions": list(instructions),
+            "steps": list(instructions),
             "image": scraper.image(),
             "host": scraper.host()
         }
@@ -118,7 +118,7 @@ def parse_backup(file: UploadFile):
                     "totalTime": 0,
                     "yields": "",
                     "ingredients": parse_recipe_ingredients(recipe["Ingredients"], ureg),
-                    "instructions": parse_recipe_instructions(recipe["Instructions"]),
+                    "steps": parse_recipe_instructions(recipe["Instructions"]),
                     "image": parse_image(recipe["MainImagePath"], image_file, zip),
                     "host": "",
                     "notes": recipe["Notes"]
