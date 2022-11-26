@@ -26,8 +26,8 @@ def test_recipe_parse():
     assert parsed_response["ingredients"][1]["quantity"] == 2
     assert parsed_response["ingredients"][1]["unit"] == "teaspoon"
     
-    assert len(parsed_response["instructions"]) == 2
-    assert parsed_response["instructions"][0]["minutes"] == 12
+    assert len(parsed_response["steps"]) == 2
+    assert parsed_response["steps"][0]["minutes"] == 12
     
     assert parsed_response["image"].startswith("http")
 
@@ -44,8 +44,8 @@ def test_recipe_parse_download_image():
     assert parsed_response["ingredients"][1]["quantity"] == 2
     assert parsed_response["ingredients"][1]["unit"] == "teaspoon"
     
-    assert len(parsed_response["instructions"]) == 2
-    assert parsed_response["instructions"][0]["minutes"] == 12
+    assert len(parsed_response["steps"]) == 2
+    assert parsed_response["steps"][0]["minutes"] == 12
     
     assert parsed_response["image"].startswith("data:")
 
@@ -74,11 +74,11 @@ def test_parse_backup():
     assert parsed_response[0]["ingredients"][1]["quantity"] == 1
     assert parsed_response[0]["ingredients"][1]["unit"] == "cup"
     
-    assert len(parsed_response[0]["instructions"]) == 6
-    assert parsed_response[0]["instructions"][0]["raw"] == "Blend carrots, vegetable oil, sugar, and eggs together for about 5 minutes till smooth"
-    assert parsed_response[0]["instructions"][0]["minutes"] == 5
-    assert parsed_response[0]["instructions"][1]["raw"] == "Sift flour on a separate container"
-    assert parsed_response[0]["instructions"][1]["minutes"] == 0
+    assert len(parsed_response[0]["steps"]) == 6
+    assert parsed_response[0]["steps"][0]["raw"] == "Blend carrots, vegetable oil, sugar, and eggs together for about 5 minutes till smooth"
+    assert parsed_response[0]["steps"][0]["minutes"] == 5
+    assert parsed_response[0]["steps"][1]["raw"] == "Sift flour on a separate container"
+    assert parsed_response[0]["steps"][1]["minutes"] == 0
 
 def test_parse_backup_bad_mime():
     response = client.post(backup_test_url, files={"file": ("test_backup.zip", open("test/test_backup.zip", "rb"), "application/not-zip")})
